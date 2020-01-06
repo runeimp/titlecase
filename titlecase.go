@@ -1,4 +1,4 @@
-package caseit
+package titlecase
 
 import (
 	"bufio"
@@ -49,7 +49,7 @@ func NewMutable(v string) Mutable {
 const (
 	smallWords  = `a|an|and|as|at|but|by|en|for|if|in|of|on|or|the|to|v\.?|via|vs\.?|with`
 	punctuation = `!"“#$%&'‘()*+,\-–‒—―./:;?@[\\\]_` + "`" + `{|}~`
-	Version     = "1.0.0-alpha"
+	Version     = "1.0.0"
 )
 
 var (
@@ -73,7 +73,7 @@ func capitalize(s string) string {
 }
 
 /**
- * TitleCases input text
+ * Convert input text
  *
  * This filter changes all words to Title Caps, and attempts to be clever
  * about *un*capitalizing small words like a/an/the in the input.
@@ -81,7 +81,7 @@ func capitalize(s string) string {
  * The list of "small words" which are not capped comes from
  * the New York Times Manual of Style, plus 'vs', 'v', and 'with'.
  */
-func TitleCase(input string, args ...interface{}) string {
+func Convert(input string, args ...interface{}) string {
 	var (
 		callback       tcCallback = nil
 		processed                 = []string{}
@@ -102,27 +102,35 @@ func TitleCase(input string, args ...interface{}) string {
 	scanner := bufio.NewScanner(strings.NewReader(input))
 	for scanner.Scan() {
 		line := scanner.Text()
-		allCaps := strings.ToUpper(line) == line
+		// fmt.Printf("titlecase.Convert() | line = %q\n", line)
+		lineAllCaps := false
+		if strings.ToUpper(line) == line {
+			lineAllCaps = true
+		}
 		words := strings.Fields(line)
 		tcLine := []Mutagenic{}
 		for _, word := range words {
+			// wordAllCaps := false
+			// if strings.ToUpper(word) == word {
+			// 	wordAllCaps = true
+			// }
+
 			if callback != nil {
-				newWord := callback(word, allCaps)
+				newWord := callback(word, lineAllCaps)
 				if newWord != "" {
 					tcLine = append(tcLine, NewImmutable(newWord))
 					continue
 				}
 			}
 
-			if allCaps {
-				if UCInitials.MatchString(word) {
-					tcLine = appendage(tcLine, word)
-
-					continue
-				}
+			if lineAllCaps && UCInitials.MatchString(word) {
+				// fmt.Printf("titlecase.Convert() | UCInitials   | word = %q\n", word)
+				tcLine = appendage(tcLine, word)
+				continue
 			}
 
 			if AposSecond.MatchString(word) {
+				// fmt.Printf("titlecase.Convert() | AposSecond   | word = %q\n", word)
 				if len(word) > 0 && !strings.Contains("aeiouAEIOU", word[0:1]) {
 					word = strings.ToLower(word[0:1]) + word[1:2] + strings.ToUpper(word[2:3]) + word[3:]
 				} else {
@@ -133,43 +141,50 @@ func TitleCase(input string, args ...interface{}) string {
 			}
 
 			if MacMc.MatchString(word) {
+				// fmt.Printf("titlecase.Convert() | MacMc       | word = %q\n", word)
 				matches := MacMc.FindStringSubmatch(word)
 				tcLine = appendage(
 					tcLine,
 					fmt.Sprintf("%s%s",
 						capitalize(matches[1]),
-						TitleCase(matches[2], callback, smallFirstLast),
+						Convert(matches[2], callback, smallFirstLast),
 					),
 				)
 				continue
 			}
 
-			if InlinePeriod.MatchString(word) || !allCaps && UCElsewhere.MatchString(word) {
+			if InlinePeriod.MatchString(word) || (!lineAllCaps && UCElsewhere.MatchString(word)) {
+				// fmt.Printf("titlecase.Convert() | InlinePeriod | lineAllCaps = %t | wordAllCaps = %t | word = %q\n", lineAllCaps, wordAllCaps, word)
 				tcLine = appendage(tcLine, word)
 				continue
 			}
 
 			if SmallWords.MatchString(word) {
+				// fmt.Printf("titlecase.Convert() | SmallWords   | word = %q\n", word)
 				tcLine = appendage(tcLine, strings.ToLower(word))
 				continue
 			}
 
 			if strings.Contains(word, "/") && !strings.Contains(word, "//") {
+				// fmt.Printf("titlecase.Convert() | Slashes      | word = %q\n", word)
 				slashed := titleDelimited(word, "-", callback, smallFirstLast)
 				tcLine = appendage(tcLine, slashed)
 				continue
 			}
 
 			if strings.Contains("-", word) {
+				// fmt.Printf("titlecase.Convert() | Hyphens      | word = %q\n", word)
 				hyphenated := titleDelimited(word, "-", callback, smallFirstLast)
 				tcLine = appendage(tcLine, hyphenated)
 				continue
 			}
 
-			if allCaps {
+			if lineAllCaps {
+				// fmt.Printf("titlecase.Convert() | ALLCAPS      | word = %q\n", word)
 				word = strings.ToLower(word)
 			}
 
+			// fmt.Printf("titlecase.Convert() | CapFirst     | word = %q\n", word)
 			tcLine = appendage(tcLine, CapFirst.ReplaceAllStringFunc(word, strings.ToUpper))
 		} // end of word loop
 
@@ -217,9 +232,9 @@ func TitleCase(input string, args ...interface{}) string {
 }
 
 func titleDelimited(s, d string, callback tcCallback, smallFirstLast bool) string {
-	delimited := strings.Split(s, "-")
+	delimited := strings.Split(s, d)
 	for i, t := range delimited {
-		delimited[i] = TitleCase(t, callback, smallFirstLast)
+		delimited[i] = Convert(t, callback, smallFirstLast)
 	}
-	return strings.Join(delimited, "-")
+	return strings.Join(delimited, d)
 }
