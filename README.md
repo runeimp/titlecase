@@ -1,4 +1,4 @@
-TitleCase
+TitleCase v1.0.0
 =========
 
 Based on Stuart Colville's `titlecase.py` now maintained by Pat Pannuto at <https://github.com/ppannuto/python-titlecase> which in turn is based on [John Gruber's `titlecase.pl`][]
